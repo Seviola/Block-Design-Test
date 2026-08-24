@@ -1,0 +1,170 @@
+package controller
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+
+	"oamp-backend/internal/config"
+	"oamp-backend/internal/model"
+	"oamp-backend/pkg/response"
+
+	"github.com/gin-gonic/gin"
+)
+
+// SubmitGameResult — POST /api/v1/game/submit
+// Accepts game client payload (bracelet UID scan → store task results)
+// Every submission creates a NEW GameSession row (appends, never replaces).
+// Leaderboard picks best per participant via DISTINCT ON / LATERAL LIMIT 1.
+func SubmitGameResult(c *gin.Context) {
+	var result model.GameResult
+	if err := c.ShouldBindJSON(&result); err != nil {
+		response.Error(c, http.StatusBadRequest, response.FormatBindError(err))
+		return
+	}
+
+	if result.UID == "" {
+		response.Error(c, http.StatusBadRequest, "uid is required")
+		return
+	}
+
+	// Default to training if not specified
+	if result.Mode == "" {
+		result.Mode = "training"
+	}
+
+	// Find participant by UID from bracelet
+	var participant model.Participant
+	if err := config.DB.Where("uid = ?", result.UID).First(&participant).Error; err != nil {
+		response.Error(c, http.StatusBadRequest, "Participant not found. Please register first.")
+		return
+	}
+
+	// Always save to game_results (AI analysis)
+	if err := saveGameResult(&result); err != nil {
+		log.Printf("[WARN] saveGameResult failed for uid=%s: %v", result.UID, err)
+	}
+
+	// Save to game_sessions for both training and competition (leaderboard)
+	if err := saveGameSession(&result, participant.ID); err != nil {
+		log.Printf("[WARN] saveGameSession failed for uid=%s: %v", result.UID, err)
+	}
+
+	response.CreatedWithMessage(c, "Game result recorded", gin.H{
+		"uid":      result.UID,
+		"mode":     result.Mode,
+		"task_avg": result.TaskAvg,
+	})
+}
+
+// saveGameResult upserts into game_results (AI analysis)
+func saveGameResult(result *model.GameResult) error {
+	cogJSON, _ := json.Marshal(result.CogAgeList)
+	varJSON, _ := json.Marshal(result.VariantList)
+
+	return config.DB.Exec(
+		`INSERT INTO game_results (uid, mode, nick_name, gender, age, task01, task02, task03, task04, task05, task06, task07, task08, task_avg, cognitive_age, visuo_spatial, cog_age_list, variant_list, client_ts, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT (uid) DO UPDATE SET
+		 	mode = EXCLUDED.mode,
+		 	nick_name = EXCLUDED.nick_name,
+		 	gender = EXCLUDED.gender,
+		 	age = EXCLUDED.age,
+		 	task01 = EXCLUDED.task01,
+		 	task02 = EXCLUDED.task02,
+		 	task03 = EXCLUDED.task03,
+		 	task04 = EXCLUDED.task04,
+		 	task05 = EXCLUDED.task05,
+		 	task06 = EXCLUDED.task06,
+		 	task07 = EXCLUDED.task07,
+		 	task08 = EXCLUDED.task08,
+		 	task_avg = EXCLUDED.task_avg,
+		 	cognitive_age = EXCLUDED.cognitive_age,
+		 	visuo_spatial = EXCLUDED.visuo_spatial,
+		 	cog_age_list = EXCLUDED.cog_age_list,
+		 	variant_list = EXCLUDED.variant_list,
+		 	client_ts = EXCLUDED.client_ts,
+		 	created_at = EXCLUDED.created_at`,
+		result.UID, result.Mode, result.NickName, result.Gender, result.Age,
+		result.Task01, result.Task02, result.Task03, result.Task04,
+		result.Task05, result.Task06, result.Task07, result.Task08,
+		result.TaskAvg, result.CognitiveAge, result.VisuoSpatial,
+		string(cogJSON), string(varJSON), result.ClientTs,
+	).Error
+}
+
+// saveGameSession computes leaderboard fields and appends a new row into game_sessions.
+// Each submission creates a new record — history accumulates, leaderboard picks best.
+func saveGameSession(result *model.GameResult, participantID uint) error {
+	// Count completed levels (non-zero tasks)
+	levelReached := 0
+	if result.Task01 > 0 {
+		levelReached++
+	}
+	if result.Task02 > 0 {
+		levelReached++
+	}
+	if result.Task03 > 0 {
+		levelReached++
+	}
+	if result.Task04 > 0 {
+		levelReached++
+	}
+	if result.Task05 > 0 {
+		levelReached++
+	}
+	if result.Task06 > 0 {
+		levelReached++
+	}
+	if result.Task07 > 0 {
+		levelReached++
+	}
+	if result.Task08 > 0 {
+		levelReached++
+	}
+
+	// total_time: sum of all task times (for score formula)
+	totalTime := result.Task01 + result.Task02 + result.Task03 + result.Task04 +
+		result.Task05 + result.Task06 + result.Task07 + result.Task08
+
+	// visuo_spatial_fit: normalize 0-100 → 0.0-1.0
+	visuoSpatialFit := result.VisuoSpatial / 100.0
+
+	// dexterity_score: stored but not used in score (was cognitive_age/real_age)
+	dexterityScore := 0.0
+
+	// Score: level_reached × 1000 - total_time × 10 (level-dominant, speed-tiebreaker)
+	score := float64(levelReached)*1000 - totalTime*10
+	if score < 0 {
+		score = 0
+	}
+
+	// Get active batch
+	var batchID uint = 1
+	config.DB.Model(&model.EventBatch{}).Where("is_active = ?", true).Select("id").Scan(&batchID)
+
+	session := model.GameSession{
+		ParticipantID:   participantID,
+		EventBatchID:    batchID,
+		Mode:            result.Mode,
+		LevelReached:    levelReached,
+		TotalTime:       totalTime,
+		CognitiveAge:    int(result.CognitiveAge),
+		VisuoSpatialFit: visuoSpatialFit,
+		DexterityScore:  dexterityScore,
+		Score:           score,
+	}
+
+	return config.DB.Create(&session).Error
+}
+
+// GetParticipantByUID — GET /api/v1/participants/uid/:uid
+func GetParticipantByUID(c *gin.Context) {
+	uid := c.Param("uid")
+	var participant model.Participant
+	if err := config.DB.Where("uid = ?", uid).First(&participant).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Participant not found")
+		return
+	}
+	response.OKWithMessage(c, "Participant found", participant)
+}
