@@ -12,3 +12,14 @@ We are a technology initiative driven by **Computer Engineering** students at **
 ### 🧩 Otak Atik Merah Putih (OAMP)
 
 An automated cognitive and dexterity analysis system built on interactive robotic gameplay.
+
+| |
+| - |
+
+**🌐 Web Dashboard + REST API**
+
+- React 19 admin panel with real-time leaderboard
+- Midtrans (QRIS) payment gateway
+- AI-powered health reports via multi-provider LLM
+- Telegram bot notifications on payment settlement
+- PostgreSQL + websocket duel match spectating
