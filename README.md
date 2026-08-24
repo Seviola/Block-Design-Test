@@ -23,17 +23,6 @@ An automated cognitive and dexterity analysis system built on interactive roboti
 - PostgreSQL + websocket duel match spectating
 
 ---
-📦 Repositories
-Repo	Status	Description
-🔓 oamp-bdt-dekstop-app-python	Public	Desktop game client — YOLO hand detection, MediaPipe tracking, tournament cup mode
-🔒 oamp-backend	Private	Golang/Gin core server — CRUD, WebSocket duels, Midtrans webhooks, LLM health reports
-🔒 oamp-frontend	Private	React 19 + Vite 8 dashboard — leaderboard, tournaments, AI report Markdown rendering
-graph LR
-    A[BDT Desktop<br/>Python/CustomTkinter] -->|REST + WebSocket| B[Backend Server<br/>Go/Gin/PostgreSQL]
-    C[Web Dashboard<br/>React/Vite/Tailwind] -->|REST API| B
-    B -->|Webhook| D[Midtrans Payment]
-    B -->|Notify| E[Telegram Bot]
-    B -->|Analyze| F[LLM Providers]
 
 ## 🛠️ Tech Stack
 
