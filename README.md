@@ -23,3 +23,5 @@ An automated cognitive and dexterity analysis system built on interactive roboti
 - AI-powered health reports via multi-provider LLM
 - Telegram bot notifications on payment settlement
 - PostgreSQL + websocket duel match spectating
+| |
+| - |
