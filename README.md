@@ -1,9 +1,4 @@
 # 🤖 Welcome to OtakAtik Robotics
-
-**Building the Future of Education through Robotic Interaction & Artificial Intelligence**
-
-[🌐 Website](https://projectidek.dev/) • [🚀 Project](#-featured-project) • [📦 Repositories](#-repositories) • [🛠️ Tech Stack](#️-tech-stack) • [📬 Contact](#-contact--demo)
-
 ---
 
 ## 💡 About Us
