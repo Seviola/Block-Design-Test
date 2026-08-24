@@ -3,11 +3,7 @@
 
 ## 💡 About Us
 
-We are a technology initiative driven by **Computer Engineering** students at **Politeknik Elektronika Negeri Surabaya (PENS)**.
-
-**OtakAtik Robotics** focuses on developing interactive robotic systems for education.
-
-> 🧒 Ages 3+ | 🏫 All education levels | 🧠 AI-powered
+We are a technology initiative driven by **Computer Engineering** students at **Politeknik Elektronika Negeri Surabaya (PENS)**, under the guidance of **Adnan Rachmat Anom Besari S.ST., M.Sc., Ph.D.** **Maretha Ruswiansari, S.ST., M.T.**
 
 ---
 
